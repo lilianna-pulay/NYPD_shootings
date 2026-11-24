@@ -1,0 +1,8 @@
+"0","ggplot(eu_analysis, aes(x = reorder(Country_Region, deaths_percent), y = deaths_percent)) +"
+"0","  geom_col(fill = ""green4"") +"
+"0","  coord_flip() +"
+"0","  labs("
+"0","    title = ""Share of EU COVID-19 Deaths by Country"","
+"0","    x = NULL,"
+"0","    y = ""Deaths Share (%)"""
+"0","  )"

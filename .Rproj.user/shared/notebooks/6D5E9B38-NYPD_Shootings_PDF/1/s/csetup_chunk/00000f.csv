@@ -1,0 +1,7 @@
+"0","knitr::opts_chunk$set(echo = TRUE)"
+"0","#Project step 1, importing the data and libraries in a clear and reproducible way"
+"0","library(tidyverse)"
+"0","library(lubridate)"
+"0","library(ggplot2)"
+"0","library(knitr)"
+"0","ndata <- read_csv(""data/ShootingsData.csv"")"

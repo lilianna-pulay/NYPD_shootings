@@ -1,0 +1,238 @@
+---
+title: "NYPD Shooting Incidence and Victim Fatalities across Age and Gender"
+author: "Lilianna Pulay"
+output: pdf_document
+date: "2026-11-14"
+---
+
+## Introduction
+
+
+The purpose of this study is to analyze the incidence of shootings and fatalities, with regards to the age and gender of the victim. The data set used is the NYPD Shooting Incident Data, which is historical incident-level data, recording mainly demographic and location data of the shootings. The below analysis seeks to answer 2 main questions:
+
+* What is the distribution, based on age and gender, of the total shooting victims?
+* What is the distribution, based on age and gender, of the total fatalities?
+
+
+```{r setup, message= FALSE, warning = FALSE, echo = TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+#Project step 1, importing the data and libraries in a clear and reproducible way
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+library(knitr)
+ndata <- read_csv("data/ShootingsData.csv")
+```
+
+```{r data-summary}
+# Project step 2 , remove the unnecessary columns from the table that are not needed
+#check to see missing data, describe how you will handle the missing data, 
+#and show a summary of the data
+ndata <- ndata %>%
+  select(
+    OCCUR_DATE,
+    STATISTICAL_MURDER_FLAG,
+    VIC_AGE_GROUP,
+    VIC_SEX
+  )
+    
+    # Display an overview of the selected variables
+    summary(ndata)
+
+    #See if there is data which is missing
+    colSums(is.na(ndata))
+    
+    #check the unique columns for the age group and victim sex, 
+    #since murder flag is logical and only has true false
+
+    unique(ndata$VIC_SEX)
+    
+    unique(ndata$VIC_AGE_GROUP)
+```
+## Data Cleaning
+
+A summary of the chosen variables was created to give information about the variables. ColSums(is.na()) was used to check if there are any missing values for the chosen columns. There appears to be no missing values. Statistical murder flag shows a logical value with either True or False, so this does not need to be further cleaned. Occurrence date is written as a string, requiring a mutation to transform it into a date format. In the summary data, victim age group and sex have multiple unique values, requiring a unique() function call to assess the values. Sex has M, F, and a U tag for unknown, and age has 5 valid age ranges, "Unknown" and a value of "1022" which appears to be a possible mistype. In the step below, Age and Sex will be standardized (Sex = Male, Female) (Age = <18, 19-24, 25-44, 45-64, 65+), all other answers will be removed through the mutate function. Then a filter will be applied to exclude all "Unknown"s from the data.  
+
+
+```{r Data cleaning}
+
+#Project step 2, remove
+#Step to turn the date into date format from text
+ndata <- ndata %>%
+  mutate(OCCUR_DATE=mdy(OCCUR_DATE))
+
+#step to clean the data of the victims and standardize the variable names
+vicdata <- ndata %>%
+  mutate(
+    v_sex = case_when(
+      VIC_SEX == "M" ~ "Male",
+      VIC_SEX == "F" ~ "Female",
+      TRUE ~ "Unknown"
+    ),
+    v_age = case_when(
+      VIC_AGE_GROUP %in% c("<18","18-24","25-44","45-64", "65+") ~ VIC_AGE_GROUP,
+      TRUE ~ "Unknown"
+    ))
+
+
+ vicdata_fil <- vicdata %>%   
+ filter(
+     v_sex != "Unknown",
+     v_age != "Unknown"
+   )
+ 
+```
+
+
+
+## Shooting Incidence and Fatality by Age and Sex
+
+
+```{r fatality, fig.width=6.5, fig.height=3.5, out.width="95%"}
+  # Project part 3 analysis and data visualizations 
+#create a summary of the fatalities across both age and sex
+ fatal_sum <- vicdata_fil %>%
+  mutate(v_age = factor( #Mutation to make sure that <18 goes to the beginning of the list and not after 65
+    v_age,
+    levels = c("<18", "18-24", "25-44", "45-64", "65+")
+  )) %>%
+    group_by(v_age, v_sex) %>%
+    summarize(
+      total_victims = n(),
+      fatalities = sum(STATISTICAL_MURDER_FLAG, na.rm = TRUE),
+      fatal_rate = round(fatalities / total_victims * 100, 1),
+      .groups = "drop"
+    )
+  
+  knitr::kable(
+    fatal_sum, 
+    col.names = c("Age Group", "Sex", "Total Victims", "Fatalities", "Fatality Rate (%)")
+  )
+  
+  ggplot(fatal_sum, 
+  aes(x = v_age, y = fatal_rate, 
+  fill = v_sex, group = v_sex)) +
+  geom_col(position = "dodge") +
+  scale_fill_manual(values = c("Female" ="brown3", "Male" = "royalblue")) +
+  labs(
+    title = "Shooting Fatality Rate by Victim Age Group and Sex",
+    x = "Victim Age Group",
+    y = "Fatality Rate (%)",
+    fill = "Sex")
+  
+```
+
+## Percentage of Victim Shooting Incidence and Fatality by Age
+
+```{r plot age shooting incident percentage}
+# Project part 3 analysis and data visualizations
+#Create data for the comparison of ages including the shooting percent and the fatality rate
+age_comp <- vicdata_fil %>%
+  mutate(v_age = factor( #Mutation to make sure that <18 goes to the beginning of the list and not after 65
+    v_age,
+    levels = c("<18", "18-24", "25-44", "45-64", "65+")
+  )) %>%
+  group_by(v_age) %>%
+  summarize(
+    total_victims = n(),
+    p_shoot = round(n() / nrow(vicdata_fil) * 100, 1),
+    fatal_rate = round(mean(STATISTICAL_MURDER_FLAG, na.rm = TRUE) * 100, 1),
+    .groups = "drop")
+
+knitr::kable(age_comp, 
+  col.names = c("Age Group", "Total Victims", "Percent of Shootings (%)", 
+  "Fatality Rate (%)"))
+```
+
+## Visualization of Percentage Total Shootings and Total fatalities across Age Group
+
+```{r plot age shooting incidence, fig.width=6.5, fig.height=3.5, out.width="95%"}
+# Project part 3 analysis and data visualizations
+ggplot(age_comp, aes(y = v_age, x = p_shoot))+
+  geom_segment(aes(xend = p_shoot, x=0, yend=v_age), 
+  color = "royalblue")+ geom_point(color = "royalblue", size = 2)+
+  labs(
+    title = "Percentage of Total Shootings by Age Group",
+    y= "Age Group",
+    x= "Percent of Shootings (%)"
+  )
+
+
+#adjust the shooting incidence rates to adjust for the age group size disparities
+age_adjusted <- age_comp %>%
+  mutate(
+    years_in_group = case_when(
+      v_age == "<18"   ~ 18,
+      v_age == "18-24" ~ 7,
+      v_age == "25-44" ~ 20,
+      
+      v_age == "45-64" ~ 20,
+      v_age == "65+"   ~ 20
+    ),
+    
+    pct_per_year = round(p_shoot / years_in_group, 2),
+  relative_shoot = round(pct_per_year / sum(pct_per_year) * 100, 1))
+
+
+knitr::kable(
+  age_adjusted %>% select(v_age, years_in_group, p_shoot, relative_shoot),
+  col.names = c("Age Group", "Years in Bracket", "Percent of Total (%)", "Adjusted Percent of Shootings (%)")
+)
+
+
+ggplot(age_adjusted, aes(y = v_age, x = relative_shoot)) +
+  geom_segment(aes(x = 0, xend = relative_shoot, yend = v_age), color = "royalblue") +
+  geom_point(color = "royalblue", size = 2) +
+  labs(
+    title = "Percent of Shootings per Age Group, Adjusted based on Group Size",
+    y = "Age Group",
+    x = "Adjusted Percent of Shootings (%)"
+  )
+  
+  
+
+
+```
+
+
+
+## Analysis
+
+There appears to be a clear positive correlation between age group and fatality rates. The fatality rate starts at around 13.2-13.3% for victims under 18, increases to around 16.1-16.6%, 21.7-23.4% for ages 25-44 and peaking with the older adults at 25.7-32.5%. When the age brackets are normalized, there is a clear larger concentration of shootings in the 18-24 age range, however, without population level demographic data, there is not enough evidence to make an assumption.
+
+When measuring total victims, males are overwhelmingly more likely to be the victims of shootings, indicating that there is a strong gender gap in the incidence of violent crime. Fatality rates are nearly identical between men and women within the same age group. There is a slight deviation in the gender split of the 65+ age group, but this can be attributed to the significantly lower sample size (n=70, female) (n=166, male)
+
+Based on the original age grouping, the 25-44 year old age group appears to have the highest incidence of shootings. After adjusting for the size of each category, the 18-24 age group became the clear leader in shooting incidents, however conclusions should not be drawn from the normalized data. This analysis was created purely to highlight that a deeper analysis should be done with population-level data to accurately determine the shooting incidence broken down by age. 
+
+
+## Bias Identification
+
+There is a confounding variable bias that affects the relationship of fatal shootings with age. Although there is a clear increase in the fatality of attacks across age, it is unlikely that attacks against elderly individuals are disproportionately violent. The data from the NYPD shooting database is generalized data, which excludes health prior to the shooting, where the individual was shot, or the medical response times. With the limited amount of personal data from the victims, it is not possible to conclude any specific driver causing the increase of shooting fatalities with age.
+
+Additionally, the amount of ages making up the grouping is not standardized. For example, the age ranges measured for young adults (18-24) is 7 days whereas the age range of adults is 25-44 (20 days). An analysis with normalized age ranges was performed to adjust for this and the the adults aged 18-22 became a drastically larger percentage of the population. Although normalized age range data is not conclusive, it indicates that more studies should be performed using population-level data for a better picture of the true distribution.
+
+As a woman analyzing crime data, I recognize a personal bias which stems from my insecurity regarding personal safety. Initially, I may have overestimated the rate at which women are the victims of violent crimes. To mitigate this bias, I separated the data by age and gender and evaluated the incident volume objectively, only taking the reported numbers into account. 
+
+
+
+## Conclusion
+
+When the total shootings across age are taken into account, it can be concluded that there are overwhelmingly less shootings affecting individuals over the age of 45 years old. The victim age group peaks at around 25-44 at 42.7%, and rapidly drops off after 45, with 7.1% seen in the 45-64 age group and only 0.8% of the shootings are targeting adults in the 65+ category. In spite of this, the shooting fatality rates appear to correlate inversely with the shooting incident rates, broken up by age. There is a positive trend between victim age and fatality rates, this can likely be attributed to age-related lower physical resilience. However, the population data is missing key information such as the location where the victim was shot, the medical response time, and prior health background on the victim. Analysis should be done with these factors taken into account to be able to confidently conclude the driving factor. 
+
+The occurrence of shooting frequency has a very strong gender gap. Male victims, overall, make up about 27 thousand victims compared to women making up only 2.9 thousand victims.In spite of this, there seems to be no correlation of the occurrence of fatal shootings based on gender by age, with only a slight variation in the age group of 65+, attributed to the low sample size for that category. 
+
+When the shooting incidence was normalized to account for the uneven age bracket size, there was a clear concentration of shootings in the 18-24 age range. Additional reserach should be done, accounting for population-level demographic data to account for this. 
+
+```{r session info}
+sessionInfo()
+
+#Sources
+#ggplot2.tidyverse.org/reference
+#https://www.data-to-viz.com
+#https://dplyr.tidyverse.org/reference/
+#https://pkg.yihui.org/rmarkdown-cookbook/kable
+#https://r-graph-gallery.com/
+#https://catalog.data.gov/dataset/archived_nypd-shooting-incident-data-historic
+
+
+```

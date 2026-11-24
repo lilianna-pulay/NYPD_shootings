@@ -1,0 +1,6 @@
+"0",""
+"0","## assign to variables so the data can be used easily"
+"0",""
+"0","global_cases <-  read_csv(urls[1])"
+"0","global_deaths <-  read_csv(urls[2])"
+"0",""
